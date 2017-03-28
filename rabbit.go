@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/streadway/amqp"
+	"github.com/willf/bloom"
 )
 
 func setupRabbitConnection(URI string) (*amqp.Connection, error) {
@@ -52,7 +54,13 @@ func launchRabbitWorkers(parsedMessageChan chan ParsedMessage, conn *amqp.Connec
 }
 
 func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel) {
-	for parsedMessage := range parsedMessageChan {
+
+	inputChan := parsedMessageChan
+	outputChan := make(chan ParsedMessage)
+
+	go dedupeStream(inputChan, outputChan)
+
+	for parsedMessage := range outputChan {
 
 		jsonData, err := json.Marshal(parsedMessage)
 		if err != nil {
@@ -74,4 +82,32 @@ func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel) {
 			log.Println("Failed to publish to rabbit")
 		}
 	}
+}
+
+func dedupeStream(inputChan, outputChan chan ParsedMessage) {
+
+	ticker := time.NewTicker(time.Second * 1)
+	bloomFilter := bloom.NewWithEstimates(10000, 0.000001)
+
+	for {
+		select {
+
+		case parsedMessage := <-inputChan:
+			// created parsed message key
+			key := makeKey(parsedMessage)
+			if !bloomFilter.Test(key) {
+				// not seen data in this second
+				bloomFilter.Add(key)
+				outputChan <- parsedMessage
+			}
+
+		case <-ticker.C:
+			bloomFilter.ClearAll()
+		}
+	}
+}
+
+func makeKey(parsedMessage ParsedMessage) []byte {
+	b := append([]byte(parsedMessage.Table), []byte(parsedMessage.Op)...)
+	return append(b, []byte(parsedMessage.Data["id"].Value)...)
 }
