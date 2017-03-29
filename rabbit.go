@@ -41,13 +41,19 @@ func setupRabbitConnection(URI string) (*amqp.Connection, error) {
 
 func launchRabbitWorkers(parsedMessageChan chan ParsedMessage, conn *amqp.Connection, workerCount int) {
 	var wg sync.WaitGroup
+
+	inputChan := parsedMessageChan
+	outputChan := make(chan ParsedMessage)
+
+	go dedupeStream(inputChan, outputChan)
+
 	for w := 1; w <= workerCount; w++ {
 		ch, err := conn.Channel()
 		if err != nil {
 			log.Println(err.Error())
 			continue
 		}
-		go launchRabbitPush(parsedMessageChan, ch)
+		go launchRabbitPush(outputChan, ch)
 		wg.Add(workerCount)
 	}
 	wg.Wait()
@@ -55,12 +61,7 @@ func launchRabbitWorkers(parsedMessageChan chan ParsedMessage, conn *amqp.Connec
 
 func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel) {
 
-	inputChan := parsedMessageChan
-	outputChan := make(chan ParsedMessage)
-
-	go dedupeStream(inputChan, outputChan)
-
-	for parsedMessage := range outputChan {
+	for parsedMessage := range parsedMessageChan {
 
 		jsonData, err := json.Marshal(parsedMessage)
 		if err != nil {
@@ -85,9 +86,10 @@ func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel) {
 }
 
 func dedupeStream(inputChan, outputChan chan ParsedMessage) {
-
-	ticker := time.NewTicker(time.Second * 1)
+	timePeriod := time.Second * 1
+	ticker := time.NewTicker(timePeriod)
 	bloomFilter := bloom.NewWithEstimates(10000, 0.000001)
+	messagesThisPeriod := 0
 
 	for {
 		select {
@@ -96,13 +98,20 @@ func dedupeStream(inputChan, outputChan chan ParsedMessage) {
 			// created parsed message key
 			key := makeKey(parsedMessage)
 			if !bloomFilter.Test(key) {
-				// not seen data in this second
+				// not seen data in this time period
 				bloomFilter.Add(key)
 				outputChan <- parsedMessage
+			} else {
+				log.Printf("found dupe %+v\n", parsedMessage)
 			}
+			messagesThisPeriod += 1
 
 		case <-ticker.C:
 			bloomFilter.ClearAll()
+			// calculate messages / second
+			messageRate := float64(messagesThisPeriod) / timePeriod.Seconds()
+			log.Printf("message rate is %.2f/s\n", messageRate)
+			messagesThisPeriod = 0
 		}
 	}
 }
