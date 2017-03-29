@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/streadway/amqp"
-	"github.com/willf/bloom"
 )
 
 func setupRabbitConnection(URI string) (*amqp.Connection, error) {
@@ -88,7 +87,7 @@ func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel) {
 func dedupeStream(inputChan, outputChan chan ParsedMessage) {
 	timePeriod := time.Second * 1
 	ticker := time.NewTicker(timePeriod)
-	bloomFilter := bloom.NewWithEstimates(10000, 0.000001)
+	checkMessages := make(map[string]bool)
 	messagesThisPeriod := 0
 
 	for {
@@ -96,10 +95,10 @@ func dedupeStream(inputChan, outputChan chan ParsedMessage) {
 
 		case parsedMessage := <-inputChan:
 			// created parsed message key
-			key := makeKey(parsedMessage)
-			if !bloomFilter.Test(key) {
+			key := string(makeKey(parsedMessage))
+			if _, ok := checkMessages[key]; !ok {
 				// not seen data in this time period
-				bloomFilter.Add(key)
+				checkMessages[key] = true
 				outputChan <- parsedMessage
 			} else {
 				log.Printf("found dupe %+v\n", parsedMessage)
@@ -107,7 +106,7 @@ func dedupeStream(inputChan, outputChan chan ParsedMessage) {
 			messagesThisPeriod += 1
 
 		case <-ticker.C:
-			bloomFilter.ClearAll()
+			checkMessages = make(map[string]bool)
 			// calculate messages / second
 			messageRate := float64(messagesThisPeriod) / timePeriod.Seconds()
 			log.Printf("message rate is %.2f/s\n", messageRate)
