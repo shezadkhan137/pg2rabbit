@@ -46,14 +46,16 @@ func launchRabbitWorkers(parsedMessageChan chan ParsedMessage, conn *amqp.Connec
 			log.Println(err.Error())
 			continue
 		}
-		go launchRabbitPush(parsedMessageChan, ch)
+		go launchRabbitPush(parsedMessageChan, ch, &wg)
 		wg.Add(workerCount)
 	}
 	wg.Wait()
 	allCloseChan <- true
 }
 
-func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel) {
+func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel, wg *sync.WaitGroup) {
+
+	defer wg.Done()
 
 	for parsedMessage := range parsedMessageChan {
 
