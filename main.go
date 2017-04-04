@@ -41,8 +41,8 @@ func main() {
 
 	var messageChan chan string = make(chan string)
 	var parsedMessageChan chan ParsedMessage = make(chan ParsedMessage)
-	var closeChan chan bool = make(chan bool)
-	var allClosedChan chan bool = make(chan bool)
+	var closeChan chan bool = make(chan bool, 1)
+	var allClosedChan chan bool = make(chan bool, 1)
 	var dedupeChan chan ParsedMessage
 	if c.DedupeInterval != 0 {
 		dedupeChan = make(chan ParsedMessage)

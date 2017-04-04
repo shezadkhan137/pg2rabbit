@@ -87,7 +87,12 @@ func dedupeStream(inputChan, outputChan chan ParsedMessage, timePeriod time.Dura
 	for {
 		select {
 
-		case parsedMessage := <-inputChan:
+		case parsedMessage, ok := <-inputChan:
+			if !ok {
+				log.Printf("exiting dedupe")
+				close(outputChan)
+				return
+			}
 			// created parsed message key
 			key := string(makeKey(parsedMessage))
 			if _, ok := checkMessages[key]; !ok {
