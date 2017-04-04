@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 )
@@ -18,13 +20,17 @@ type ParsedMessage struct {
 	Data  map[string]DataCol `json:"data"`
 }
 
-func doParse(dataString string) *ParsedMessage {
+func doParse(dataString string) (*ParsedMessage, error) {
 	if strings.HasPrefix(dataString, "COMMIT") || strings.HasPrefix(dataString, "BEGIN") {
-		return nil
+		return nil, nil
 	}
 	seperatedMessages := parse(dataString)
-	parsedMessage := toStruct(seperatedMessages)
-	return &parsedMessage
+	parsedMessage, err := toStruct(seperatedMessages)
+
+	// TODO: need to validate to make sure it has a id
+	// if it doesn't return nil
+
+	return &parsedMessage, err
 }
 
 func parse(message string) []string {
@@ -74,11 +80,11 @@ func getParams(compRegEx *regexp.Regexp, url string) (paramsMap map[string]strin
 	return
 }
 
-func toStruct(seperatedMessages []string) ParsedMessage {
+func toStruct(seperatedMessages []string) (ParsedMessage, error) {
 
 	if len(seperatedMessages) < 3 {
-		fmt.Printf("Could parse message")
-		return ParsedMessage{}
+		log.Printf("Could parse message")
+		return ParsedMessage{}, errors.New("could not parse message")
 	}
 
 	_, table, op := seperatedMessages[0], seperatedMessages[1], seperatedMessages[2]
@@ -94,25 +100,24 @@ func toStruct(seperatedMessages []string) ParsedMessage {
 
 	re := regexp.MustCompile(`(?P<name>.+)\[(?P<type>.+)\]:(?P<value>.+)`)
 	for _, value := range seperatedMessages[3:] {
-		//fmt.Println(value)
 		params := getParams(re, value)
 
 		name, ok := params["name"]
 		if !ok {
-			fmt.Printf("Could not parse data")
-			return ParsedMessage{}
+			log.Printf("Could not parse name")
+			return ParsedMessage{}, errors.New("could not parse name")
 		}
 
 		type_, ok := params["type"]
 		if !ok {
-			fmt.Printf("Could not parse data")
-			return ParsedMessage{}
+			log.Printf("Could not parse data")
+			return ParsedMessage{}, errors.New("could not parse type")
 		}
 
 		value, ok := params["value"]
 		if !ok {
 			fmt.Printf("Could not parse data")
-			return ParsedMessage{}
+			return ParsedMessage{}, errors.New("could not parse value")
 		}
 
 		name = strings.Trim(name, ": ")
@@ -127,6 +132,5 @@ func toStruct(seperatedMessages []string) ParsedMessage {
 
 		parsedMessage.Data[name] = data
 	}
-
-	return parsedMessage
+	return parsedMessage, nil
 }

@@ -80,16 +80,20 @@ func setupWorkers(messageChan chan string, parsedMessageChan chan ParsedMessage,
 	var wg sync.WaitGroup
 	wg.Add(number)
 	for w := 1; w <= number; w++ {
-		go processMessageWorker(messageChan, parsedMessageChan, wg)
+		go processMessageWorker(messageChan, parsedMessageChan, &wg)
 	}
 	wg.Wait()
 	close(parsedMessageChan)
 }
 
-func processMessageWorker(messageChan chan string, parsedMessageChan chan ParsedMessage, wg sync.WaitGroup) {
+func processMessageWorker(messageChan chan string, parsedMessageChan chan ParsedMessage, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for m := range messageChan {
-		parsedMessage := doParse(m)
+		parsedMessage, err := doParse(m)
+		if err != nil {
+			log.Printf(err.Error())
+			continue
+		}
 		if parsedMessage != nil {
 			parsedMessageChan <- *parsedMessage
 		}

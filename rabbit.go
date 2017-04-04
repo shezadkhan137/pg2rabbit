@@ -9,7 +9,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func setupRabbitConnection(URI string) (*amqp.Connection, error) {
+func setupRabbitConnection(URI string, exchangeName string) (*amqp.Connection, error) {
 	conn, err := amqp.Dial(URI)
 	if err != nil {
 		return nil, err
@@ -22,13 +22,13 @@ func setupRabbitConnection(URI string) (*amqp.Connection, error) {
 	}
 
 	err = ch.ExchangeDeclare(
-		"database_changes", // name
-		"topic",            // type
-		true,               // durable
-		false,              // auto-deleted
-		false,              // internal
-		false,              // no-wait
-		nil,                // arguments
+		exchangeName, // name
+		"topic",      // type
+		true,         // durable
+		false,        // auto-deleted
+		false,        // internal
+		false,        // no-wait
+		nil,          // arguments
 	)
 
 	if err != nil {
@@ -40,19 +40,13 @@ func setupRabbitConnection(URI string) (*amqp.Connection, error) {
 
 func launchRabbitWorkers(parsedMessageChan chan ParsedMessage, conn *amqp.Connection, workerCount int) {
 	var wg sync.WaitGroup
-
-	inputChan := parsedMessageChan
-	outputChan := make(chan ParsedMessage)
-
-	go dedupeStream(inputChan, outputChan)
-
 	for w := 1; w <= workerCount; w++ {
 		ch, err := conn.Channel()
 		if err != nil {
 			log.Println(err.Error())
 			continue
 		}
-		go launchRabbitPush(outputChan, ch)
+		go launchRabbitPush(parsedMessageChan, ch)
 		wg.Add(workerCount)
 	}
 	wg.Wait()
@@ -84,8 +78,7 @@ func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel) {
 	}
 }
 
-func dedupeStream(inputChan, outputChan chan ParsedMessage) {
-	timePeriod := time.Second * 1
+func dedupeStream(inputChan, outputChan chan ParsedMessage, timePeriod time.Duration) {
 	ticker := time.NewTicker(timePeriod)
 	checkMessages := make(map[string]bool)
 	messagesThisPeriod := 0
