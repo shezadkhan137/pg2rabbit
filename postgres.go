@@ -8,7 +8,22 @@ import (
 	"github.com/jackc/pgx"
 )
 
-func launchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan string, slotName string, closeChan chan chan bool) {
+func launchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan<- string,
+	slotName string, createSlot bool, closeChan chan bool) {
+
+	defer func() {
+		close(messageChan)
+	}()
+
+	if createSlot {
+		err := repConnection.CreateReplicationSlot(slotName, "test_decoding")
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		defer func() {
+			repConnection.DropReplicationSlot(slotName)
+		}()
+	}
 
 	err := repConnection.StartReplication(slotName, 0, -1)
 	if err != nil {
@@ -21,10 +36,7 @@ func launchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan string
 	for {
 
 		select {
-		case cChan := <-closeChan:
-			close(messageChan)
-			log.Println("Exiting RDS Loop")
-			cChan <- true
+		case <-closeChan:
 			return
 		default:
 		}
@@ -52,6 +64,7 @@ func launchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan string
 		if messageCount%100 == 0 {
 			err := sendStandby(repConnection, lastWalStart)
 			if err != nil {
+				// Could have some backoff & reconnect here
 				panic(err)
 			}
 		}

@@ -38,7 +38,7 @@ func setupRabbitConnection(URI string, exchangeName string) (*amqp.Connection, e
 	return conn, nil
 }
 
-func launchRabbitWorkers(parsedMessageChan chan ParsedMessage, conn *amqp.Connection, workerCount int) {
+func launchRabbitWorkers(parsedMessageChan chan ParsedMessage, conn *amqp.Connection, workerCount int, allCloseChan chan bool) {
 	var wg sync.WaitGroup
 	for w := 1; w <= workerCount; w++ {
 		ch, err := conn.Channel()
@@ -50,6 +50,7 @@ func launchRabbitWorkers(parsedMessageChan chan ParsedMessage, conn *amqp.Connec
 		wg.Add(workerCount)
 	}
 	wg.Wait()
+	allCloseChan <- true
 }
 
 func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel) {
