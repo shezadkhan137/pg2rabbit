@@ -53,7 +53,7 @@ func main() {
 	go launchRDSStream(repConnection, messageChan, c.ReplicaSlotName, c.CreateSlot, closeChan)
 	go setupWorkers(messageChan, parsedMessageChan, c.WorkerCount)
 	go dedupeStream(parsedMessageChan, dedupeChan, time.Duration(c.DedupeInterval)*time.Second)
-	go launchRabbitWorkers(dedupeChan, rabbitConn, c.RabbitPushCount, allClosedChan)
+	go launchRabbitWorkers(c.ExchangeName, dedupeChan, rabbitConn, c.RabbitPushCount, allClosedChan)
 
 	exitChan := make(chan os.Signal, 2)
 	signal.Notify(exitChan, os.Interrupt, syscall.SIGTERM)

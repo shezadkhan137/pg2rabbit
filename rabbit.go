@@ -38,7 +38,7 @@ func setupRabbitConnection(URI string, exchangeName string) (*amqp.Connection, e
 	return conn, nil
 }
 
-func launchRabbitWorkers(parsedMessageChan chan ParsedMessage, conn *amqp.Connection, workerCount int, allCloseChan chan bool) {
+func launchRabbitWorkers(exchangeName string, parsedMessageChan chan ParsedMessage, conn *amqp.Connection, workerCount int, allCloseChan chan bool) {
 	var wg sync.WaitGroup
 	for w := 1; w <= workerCount; w++ {
 		ch, err := conn.Channel()
@@ -47,14 +47,14 @@ func launchRabbitWorkers(parsedMessageChan chan ParsedMessage, conn *amqp.Connec
 			continue
 		}
 		wg.Add(1)
-		go launchRabbitPush(parsedMessageChan, ch, &wg, w)
+		go launchRabbitPush(exchangeName, parsedMessageChan, ch, &wg, w)
 	}
 	wg.Wait()
 	log.Printf("launchRabbitWorkers: all workeers stopped\n")
 	allCloseChan <- true
 }
 
-func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel, wg *sync.WaitGroup, workerNumber int) {
+func launchRabbitPush(exchangeName string, parsedMessageChan chan ParsedMessage, ch *amqp.Channel, wg *sync.WaitGroup, workerNumber int) {
 
 	defer func() {
 		wg.Done()
@@ -68,12 +68,12 @@ func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel, wg
 			continue
 		}
 		err = ch.Publish(
-			"database_changes",  // exchange
+			exchangeName,        // exchange
 			parsedMessage.Table, // routing key
 			false,               // mandatory
 			false,               // immediate
 			amqp.Publishing{
-				ContentType: "text/plain",
+				ContentType: "application/json",
 				Body:        []byte(jsonData),
 			})
 
