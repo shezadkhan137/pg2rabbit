@@ -58,8 +58,8 @@ func main() {
 	exitChan := make(chan os.Signal, 2)
 	signal.Notify(exitChan, os.Interrupt, syscall.SIGTERM)
 	<-exitChan
-	log.Println("shutting down... please wait")
+	log.Println("main: shutting down... please wait")
 	closeChan <- true
 	<-allClosedChan
-	log.Println("shut down complete. exiting")
+	log.Println("main: exiting")
 }

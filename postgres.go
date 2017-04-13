@@ -37,6 +37,7 @@ func launchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan<- stri
 
 		select {
 		case <-closeChan:
+			log.Println("launchRDSStream: stopping postgres replication")
 			return
 		default:
 		}

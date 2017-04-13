@@ -46,16 +46,19 @@ func launchRabbitWorkers(parsedMessageChan chan ParsedMessage, conn *amqp.Connec
 			log.Println(err.Error())
 			continue
 		}
-		go launchRabbitPush(parsedMessageChan, ch, &wg)
-		wg.Add(workerCount)
+		wg.Add(1)
+		go launchRabbitPush(parsedMessageChan, ch, &wg, w)
 	}
 	wg.Wait()
+	log.Printf("launchRabbitWorkers: all workeers stopped\n")
 	allCloseChan <- true
 }
 
-func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel, wg *sync.WaitGroup) {
+func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel, wg *sync.WaitGroup, workerNumber int) {
 
-	defer wg.Done()
+	defer func() {
+		wg.Done()
+	}()
 
 	for parsedMessage := range parsedMessageChan {
 
@@ -78,7 +81,10 @@ func launchRabbitPush(parsedMessageChan chan ParsedMessage, ch *amqp.Channel, wg
 		if err != nil {
 			log.Println("Failed to publish to rabbit")
 		}
+
 	}
+
+	log.Printf("launchRabbitPush (worker %d): stopping\n", workerNumber)
 }
 
 func dedupeStream(inputChan, outputChan chan ParsedMessage, timePeriod time.Duration) {
@@ -91,7 +97,7 @@ func dedupeStream(inputChan, outputChan chan ParsedMessage, timePeriod time.Dura
 
 		case parsedMessage, ok := <-inputChan:
 			if !ok {
-				log.Printf("exiting dedupe")
+				log.Printf("dedupeStream: stopping")
 				close(outputChan)
 				return
 			}
