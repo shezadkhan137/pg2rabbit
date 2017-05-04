@@ -2,10 +2,13 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	_ "expvar"
 
 	"github.com/kelseyhightower/envconfig"
 )
@@ -39,7 +42,7 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
-	var messageChan chan string = make(chan string)
+	var messageChan chan RawMessage = make(chan RawMessage)
 	var parsedMessageChan chan ParsedMessage = make(chan ParsedMessage)
 	var closeChan chan bool = make(chan bool, 1)
 	var allClosedChan chan bool = make(chan bool, 1)
@@ -54,6 +57,8 @@ func main() {
 	go setupWorkers(messageChan, parsedMessageChan, c.WorkerCount)
 	go dedupeStream(parsedMessageChan, dedupeChan, time.Duration(c.DedupeInterval)*time.Second)
 	go launchRabbitWorkers(c.ExchangeName, dedupeChan, rabbitConn, c.RabbitPushCount, allClosedChan)
+
+	go http.ListenAndServe(":8080", http.DefaultServeMux)
 
 	exitChan := make(chan os.Signal, 2)
 	signal.Notify(exitChan, os.Interrupt, syscall.SIGTERM)

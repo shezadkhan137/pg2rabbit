@@ -1,14 +1,26 @@
 package main
 
 import (
+	"expvar"
 	"log"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx"
+	"github.com/paulbellamy/ratecounter"
 )
 
-func launchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan<- string,
+var (
+	incomingMessageRateCounter *ratecounter.RateCounter = ratecounter.NewRateCounter(1 * time.Second)
+	incomingMessagesPerSecond                           = expvar.NewInt("incoming_messages_per_second")
+)
+
+type RawMessage struct {
+	DataString string
+	Received   time.Time
+}
+
+func launchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan<- RawMessage,
 	slotName string, createSlot bool, closeChan chan bool) {
 
 	defer func() {
@@ -71,7 +83,11 @@ func launchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan<- stri
 		}
 
 		dataString := string(message.WalMessage.WalData)
-		messageChan <- dataString
+		messageChan <- RawMessage{DataString: dataString, Received: time.Now()}
+
+		// Analytics
+		incomingMessageRateCounter.Incr(1)
+		incomingMessagesPerSecond.Set(incomingMessageRateCounter.Rate())
 	}
 }
 
@@ -90,7 +106,7 @@ func setupPostgresConnection(URI string) (*pgx.ReplicationConn, error) {
 	return repConnection, nil
 }
 
-func setupWorkers(messageChan chan string, parsedMessageChan chan ParsedMessage, number int) {
+func setupWorkers(messageChan chan RawMessage, parsedMessageChan chan ParsedMessage, number int) {
 	var wg sync.WaitGroup
 	wg.Add(number)
 	for w := 1; w <= number; w++ {
@@ -100,7 +116,7 @@ func setupWorkers(messageChan chan string, parsedMessageChan chan ParsedMessage,
 	close(parsedMessageChan)
 }
 
-func processMessageWorker(messageChan chan string, parsedMessageChan chan ParsedMessage, wg *sync.WaitGroup) {
+func processMessageWorker(messageChan chan RawMessage, parsedMessageChan chan ParsedMessage, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for m := range messageChan {
 		parsedMessage, err := doParse(m)

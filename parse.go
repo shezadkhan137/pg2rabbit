@@ -6,6 +6,7 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type DataCol struct {
@@ -15,17 +16,20 @@ type DataCol struct {
 }
 
 type ParsedMessage struct {
-	Table string             `json:"table"`
-	Op    string             `json:"operation"`
-	Data  map[string]DataCol `json:"data"`
+	Table    string             `json:"table"`
+	Op       string             `json:"operation"`
+	Data     map[string]DataCol `json:"data"`
+	Received time.Time
 }
 
-func doParse(dataString string) (*ParsedMessage, error) {
+func doParse(dataMessage RawMessage) (*ParsedMessage, error) {
+	dataString := dataMessage.DataString
+
 	if strings.HasPrefix(dataString, "COMMIT") || strings.HasPrefix(dataString, "BEGIN") {
 		return nil, nil
 	}
 	seperatedMessages := parse(dataString)
-	parsedMessage, err := toStruct(seperatedMessages)
+	parsedMessage, err := toStruct(seperatedMessages, dataMessage.Received)
 
 	// TODO: need to validate to make sure it has a id
 	// if it doesn't return nil
@@ -39,8 +43,9 @@ func parse(message string) []string {
 	inQuotes := false
 
 	seperatedMessages := make([]string, 0)
+	var currentPos int
 
-	for currentPos := 0; currentPos < len(message); currentPos++ {
+	for currentPos = 0; currentPos < len(message); currentPos++ {
 		char := message[currentPos]
 
 		if char == ' ' {
@@ -65,6 +70,7 @@ func parse(message string) []string {
 
 	}
 
+	seperatedMessages = append(seperatedMessages, message[startPos:])
 	return seperatedMessages
 }
 
@@ -80,7 +86,7 @@ func getParams(compRegEx *regexp.Regexp, url string) (paramsMap map[string]strin
 	return
 }
 
-func toStruct(seperatedMessages []string) (ParsedMessage, error) {
+func toStruct(seperatedMessages []string, receivedTime time.Time) (ParsedMessage, error) {
 
 	if len(seperatedMessages) < 3 {
 		log.Printf("Could parse message")
@@ -93,9 +99,10 @@ func toStruct(seperatedMessages []string) (ParsedMessage, error) {
 	op = strings.Trim(op, ": ")
 
 	parsedMessage := ParsedMessage{
-		Table: table,
-		Op:    op,
-		Data:  make(map[string]DataCol),
+		Table:    table,
+		Op:       op,
+		Data:     make(map[string]DataCol),
+		Received: receivedTime,
 	}
 
 	re := regexp.MustCompile(`(?P<name>.+)\[(?P<type>.+)\]:(?P<value>.+)`)
