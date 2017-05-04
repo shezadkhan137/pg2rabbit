@@ -11,6 +11,7 @@ import (
 	_ "expvar"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/shezadkhan137/pg2rabbit/pg2rabbit"
 )
 
 type Config struct {
@@ -32,31 +33,31 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
-	repConnection, err := setupPostgresConnection(c.PostgresURL)
+	repConnection, err := pg2rabbit.SetupPostgresConnection(c.PostgresURL)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	rabbitConn, err := setupRabbitConnection(c.RabbitURL, c.ExchangeName)
+	rabbitConn, err := pg2rabbit.SetupRabbitConnection(c.RabbitURL, c.ExchangeName)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	var messageChan chan RawMessage = make(chan RawMessage)
-	var parsedMessageChan chan ParsedMessage = make(chan ParsedMessage)
+	var messageChan chan pg2rabbit.RawMessage = make(chan pg2rabbit.RawMessage)
+	var parsedMessageChan chan pg2rabbit.ParsedMessage = make(chan pg2rabbit.ParsedMessage)
 	var closeChan chan bool = make(chan bool, 1)
 	var allClosedChan chan bool = make(chan bool, 1)
-	var dedupeChan chan ParsedMessage
+	var dedupeChan chan pg2rabbit.ParsedMessage
 	if c.DedupeInterval != 0 {
-		dedupeChan = make(chan ParsedMessage)
+		dedupeChan = make(chan pg2rabbit.ParsedMessage)
 	} else {
 		dedupeChan = parsedMessageChan
 	}
 
-	go launchRDSStream(repConnection, messageChan, c.ReplicaSlotName, c.CreateSlot, closeChan)
-	go setupWorkers(messageChan, parsedMessageChan, c.WorkerCount)
-	go dedupeStream(parsedMessageChan, dedupeChan, time.Duration(c.DedupeInterval)*time.Second)
-	go launchRabbitWorkers(c.ExchangeName, dedupeChan, rabbitConn, c.RabbitPushCount, allClosedChan)
+	go pg2rabbit.LaunchRDSStream(repConnection, messageChan, c.ReplicaSlotName, c.CreateSlot, closeChan)
+	go pg2rabbit.SetupWorkers(messageChan, parsedMessageChan, c.WorkerCount)
+	go pg2rabbit.DedupeStream(parsedMessageChan, dedupeChan, time.Duration(c.DedupeInterval)*time.Second)
+	go pg2rabbit.LaunchRabbitWorkers(c.ExchangeName, dedupeChan, rabbitConn, c.RabbitPushCount, allClosedChan)
 
 	go http.ListenAndServe(":8080", http.DefaultServeMux)
 

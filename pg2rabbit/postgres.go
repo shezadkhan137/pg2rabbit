@@ -1,4 +1,4 @@
-package main
+package pg2rabbit
 
 import (
 	"expvar"
@@ -23,7 +23,7 @@ type RawMessage struct {
 	Received   time.Time
 }
 
-func launchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan<- RawMessage,
+func LaunchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan<- RawMessage,
 	slotName string, createSlot bool, closeChan chan bool) {
 
 	defer func() {
@@ -94,7 +94,7 @@ func launchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan<- RawM
 	}
 }
 
-func setupPostgresConnection(URI string) (*pgx.ReplicationConn, error) {
+func SetupPostgresConnection(URI string) (*pgx.ReplicationConn, error) {
 	config, err := pgx.ParseURI(URI)
 	if err != nil {
 		return nil, err
@@ -109,7 +109,7 @@ func setupPostgresConnection(URI string) (*pgx.ReplicationConn, error) {
 	return repConnection, nil
 }
 
-func setupWorkers(messageChan chan RawMessage, parsedMessageChan chan ParsedMessage, number int) {
+func SetupWorkers(messageChan chan RawMessage, parsedMessageChan chan ParsedMessage, number int) {
 	var wg sync.WaitGroup
 	wg.Add(number)
 	for w := 1; w <= number; w++ {
@@ -125,7 +125,7 @@ func processMessageWorker(messageChan chan RawMessage, parsedMessageChan chan Pa
 
 		startTime := time.Now()
 
-		parsedMessage, err := doParse(m)
+		parsedMessage, err := DoParse(m)
 		if err != nil {
 			log.Printf(err.Error())
 			continue

@@ -1,4 +1,4 @@
-package main
+package pg2rabbit
 
 import (
 	"errors"
@@ -22,7 +22,7 @@ type ParsedMessage struct {
 	Received time.Time
 }
 
-func doParse(dataMessage RawMessage) (*ParsedMessage, error) {
+func DoParse(dataMessage RawMessage) (*ParsedMessage, error) {
 	dataString := dataMessage.DataString
 
 	if strings.HasPrefix(dataString, "COMMIT") || strings.HasPrefix(dataString, "BEGIN") {

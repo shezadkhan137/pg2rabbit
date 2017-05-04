@@ -1,4 +1,4 @@
-package main
+package pg2rabbit
 
 import (
 	"encoding/json"
@@ -19,7 +19,7 @@ var (
 	averageTimeToPublishLastSecond                             = expvar.NewInt("average_time_to_publish_last_second")
 )
 
-func setupRabbitConnection(URI string, exchangeName string) (*amqp.Connection, error) {
+func SetupRabbitConnection(URI string, exchangeName string) (*amqp.Connection, error) {
 	conn, err := amqp.Dial(URI)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func setupRabbitConnection(URI string, exchangeName string) (*amqp.Connection, e
 	return conn, nil
 }
 
-func launchRabbitWorkers(exchangeName string, parsedMessageChan chan ParsedMessage, conn *amqp.Connection, workerCount int, allCloseChan chan bool) {
+func LaunchRabbitWorkers(exchangeName string, parsedMessageChan chan ParsedMessage, conn *amqp.Connection, workerCount int, allCloseChan chan bool) {
 	var wg sync.WaitGroup
 	for w := 1; w <= workerCount; w++ {
 		ch, err := conn.Channel()
@@ -102,7 +102,7 @@ func rabbitPushWorker(exchangeName string, parsedMessageChan chan ParsedMessage,
 	log.Printf("launchRabbitPush (worker %d): stopping\n", workerNumber)
 }
 
-func dedupeStream(inputChan, outputChan chan ParsedMessage, timePeriod time.Duration) {
+func DedupeStream(inputChan, outputChan chan ParsedMessage, timePeriod time.Duration) {
 	ticker := time.NewTicker(timePeriod)
 	checkMessages := make(map[string]bool)
 	messagesThisPeriod := 0

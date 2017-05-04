@@ -1,5 +1,5 @@
-hash: 51fdbc4eec5a231a8243d14b23d5cbde9e70f6741e0ece46b6cfb58e44449323
-updated: 2017-05-04T14:10:18.618481439+01:00
+hash: 5888c694a9e8e8985bb63fec68874ce4b75f3cefd17c73e8f44bb1a5ff502ea2
+updated: 2017-05-04T17:47:02.411622116+01:00
 imports:
 - name: github.com/gopherjs/gopherjs
   version: 265040a1352e0bb611e87f5b985bf83600c66cce
@@ -12,7 +12,7 @@ imports:
 - name: github.com/kelseyhightower/envconfig
   version: b6fde1625d631a48340817849a547164f395d9eb
 - name: github.com/paulbellamy/ratecounter
-  version: 5a11f585a31379765c190c033b6ad39956584447
+  version: 66b206d2a2d00245e34b1494fcaeef5e99041ea7
 - name: github.com/smartystreets/assertions
   version: c9ee7d9e9a2aeec0bee7c4a516f3e0ad7cb7e558
   subpackages:

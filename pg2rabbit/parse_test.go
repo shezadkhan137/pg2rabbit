@@ -1,4 +1,4 @@
-package main
+package pg2rabbit
 
 import (
 	"testing"
