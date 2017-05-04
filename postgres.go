@@ -13,6 +13,9 @@ import (
 var (
 	incomingMessageRateCounter *ratecounter.RateCounter = ratecounter.NewRateCounter(1 * time.Second)
 	incomingMessagesPerSecond                           = expvar.NewInt("incoming_messages_per_second")
+
+	averageParseTimeCounter    *ratecounter.AvgRateCounter = ratecounter.NewAvgRateCounter(1 * time.Second)
+	averageParseTimeLastSecond                             = expvar.NewInt("average_parse_time_last_second")
 )
 
 type RawMessage struct {
@@ -119,11 +122,18 @@ func setupWorkers(messageChan chan RawMessage, parsedMessageChan chan ParsedMess
 func processMessageWorker(messageChan chan RawMessage, parsedMessageChan chan ParsedMessage, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for m := range messageChan {
+
+		startTime := time.Now()
+
 		parsedMessage, err := doParse(m)
 		if err != nil {
 			log.Printf(err.Error())
 			continue
 		}
+
+		averageParseTimeCounter.Incr(time.Since(startTime).Nanoseconds())
+		averageParseTimeLastSecond.Set(int64(averageParseTimeCounter.Rate()))
+
 		if parsedMessage != nil {
 			parsedMessageChan <- *parsedMessage
 		}

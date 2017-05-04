@@ -2,11 +2,21 @@ package main
 
 import (
 	"encoding/json"
+	"expvar"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/paulbellamy/ratecounter"
 	"github.com/streadway/amqp"
+)
+
+var (
+	publishedMessageRateCounter *ratecounter.RateCounter = ratecounter.NewRateCounter(1 * time.Second)
+	publishedMessagesPerSecond                           = expvar.NewInt("published_messages_per_second")
+
+	averageTimeToPublishCounter    *ratecounter.AvgRateCounter = ratecounter.NewAvgRateCounter(1 * time.Second)
+	averageTimeToPublishLastSecond                             = expvar.NewInt("average_time_to_publish_last_second")
 )
 
 func setupRabbitConnection(URI string, exchangeName string) (*amqp.Connection, error) {
@@ -47,14 +57,14 @@ func launchRabbitWorkers(exchangeName string, parsedMessageChan chan ParsedMessa
 			continue
 		}
 		wg.Add(1)
-		go launchRabbitPush(exchangeName, parsedMessageChan, ch, &wg, w)
+		go rabbitPushWorker(exchangeName, parsedMessageChan, ch, &wg, w)
 	}
 	wg.Wait()
 	log.Printf("launchRabbitWorkers: all workeers stopped\n")
 	allCloseChan <- true
 }
 
-func launchRabbitPush(exchangeName string, parsedMessageChan chan ParsedMessage, ch *amqp.Channel, wg *sync.WaitGroup, workerNumber int) {
+func rabbitPushWorker(exchangeName string, parsedMessageChan chan ParsedMessage, ch *amqp.Channel, wg *sync.WaitGroup, workerNumber int) {
 
 	defer func() {
 		wg.Done()
@@ -82,6 +92,11 @@ func launchRabbitPush(exchangeName string, parsedMessageChan chan ParsedMessage,
 			log.Println("Failed to publish to rabbit")
 		}
 
+		// Analytics
+		publishedMessageRateCounter.Incr(1)
+		publishedMessagesPerSecond.Set(publishedMessageRateCounter.Rate())
+		averageTimeToPublishCounter.Incr(time.Since(parsedMessage.Received).Nanoseconds())
+		averageTimeToPublishLastSecond.Set(int64(averageTimeToPublishCounter.Rate()))
 	}
 
 	log.Printf("launchRabbitPush (worker %d): stopping\n", workerNumber)
