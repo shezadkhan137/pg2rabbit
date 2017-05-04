@@ -1,0 +1,2 @@
+table public.users_usersociallogin: UPDATE: id[integer]:32 type[character varying]:'facebook' social_id[character varying]:'10154308642985348' access_token[bytea]:'hello' user_id
+[integer]:129
