@@ -2,6 +2,6 @@ language: go
 go:
   - 1.8
 install:
-  - curl https://glide.sh/get | sh
+  - go get -v github.com/Masterminds/glide
 script:
-  - go test ./pg2rabbit/*
+  - make test
