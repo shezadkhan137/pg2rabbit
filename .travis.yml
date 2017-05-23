@@ -1,0 +1,7 @@
+language: go
+go:
+  - 1.8
+install:
+  - curl https://glide.sh/get | sh
+script:
+  - go test ./pg2rabbit/*
