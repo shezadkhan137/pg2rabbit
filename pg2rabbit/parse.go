@@ -89,14 +89,18 @@ func getParams(compRegEx *regexp.Regexp, url string) (paramsMap map[string]strin
 func toStruct(seperatedMessages []string, receivedTime time.Time) (ParsedMessage, error) {
 
 	if len(seperatedMessages) < 3 {
-		log.Printf("Could parse message")
 		return ParsedMessage{}, errors.New("could not parse message")
 	}
 
-	_, table, op := seperatedMessages[0], seperatedMessages[1], seperatedMessages[2]
+	tablePreamble, table, op := cleanString(seperatedMessages[0]), cleanString(seperatedMessages[1]), cleanString(seperatedMessages[2])
 
-	table = strings.Trim(table, ": ")
-	op = strings.Trim(op, ": ")
+	if tablePreamble != "table" {
+		return ParsedMessage{}, errors.New("could not parse message")
+	}
+
+	if !stringInSlice(op, []string{"INSERT", "UPDATE", "DELETE"}) {
+		return ParsedMessage{}, errors.New("could not parse message")
+	}
 
 	parsedMessage := ParsedMessage{
 		Table:    table,
@@ -127,9 +131,9 @@ func toStruct(seperatedMessages []string, receivedTime time.Time) (ParsedMessage
 			return ParsedMessage{}, errors.New("could not parse value")
 		}
 
-		name = strings.Trim(name, ": ")
-		type_ = strings.Trim(type_, ": ")
-		value = strings.Trim(value, ": ")
+		name = cleanString(name)
+		type_ = cleanString(type_)
+		value = cleanString(value)
 
 		data := DataCol{
 			Name:  name,

@@ -36,6 +36,7 @@ func LaunchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan<- RawM
 			log.Fatal(err.Error())
 		}
 		defer func() {
+			log.Printf("dropping replica slot %s\n", slotName)
 			repConnection.DropReplicationSlot(slotName)
 		}()
 	}
@@ -109,10 +110,10 @@ func SetupPostgresConnection(URI string) (*pgx.ReplicationConn, error) {
 	return repConnection, nil
 }
 
-func SetupWorkers(messageChan chan RawMessage, parsedMessageChan chan ParsedMessage, number int) {
+func SetupWorkers(messageChan chan RawMessage, parsedMessageChan chan ParsedMessage, workerNumber int) {
 	var wg sync.WaitGroup
-	wg.Add(number)
-	for w := 1; w <= number; w++ {
+	wg.Add(workerNumber)
+	for w := 1; w <= workerNumber; w++ {
 		go processMessageWorker(messageChan, parsedMessageChan, &wg)
 	}
 	wg.Wait()

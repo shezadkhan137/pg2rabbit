@@ -1,27 +1,10 @@
-package: github.com/shezadkhan137/pg2rabbit
+package: github/shezadkhan137/pg2rabbit
 import:
-- package: github.com/gopherjs/gopherjs
-  version: 265040a1352e0bb611e87f5b985bf83600c66cce
-  subpackages:
-  - js
 - package: github.com/jackc/pgx
-  version: c16671e77e8a1e52a942a1b9c874121a946aa7a6
-- package: github.com/jtolds/gls
-  version: bb0351aa7eb6f322f32667d51375f26a2bca6628
 - package: github.com/kelseyhightower/envconfig
-  version: b6fde1625d631a48340817849a547164f395d9eb
-- package: github.com/smartystreets/assertions
-  version: c9ee7d9e9a2aeec0bee7c4a516f3e0ad7cb7e558
-  subpackages:
-  - internal/go-render/render
-  - internal/oglematchers
+- package: github.com/paulbellamy/ratecounter
+- package: github.com/streadway/amqp
+testImport:
 - package: github.com/smartystreets/goconvey
-  version: 3bd662eac601ad6436e64776af2e112069eb2edc
   subpackages:
   - convey
-  - convey/gotest
-  - convey/reporting
-- package: github.com/streadway/amqp
-  version: afe8eee29a74d213b1f3fb2586058157c397da60
-- package: github.com/paulbellamy/ratecounter
-  version: 66b206d2a2d00245e34b1494fcaeef5e99041ea7

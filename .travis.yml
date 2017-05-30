@@ -1,7 +1,22 @@
 language: go
 go:
   - 1.8
+
+before_script:
+  - psql -c 'create database test_db;' -U postgres
+  - echo 'host    replication   all   127.0.0.1/32    trust' | sudo tee --append /etc/postgresql/9.4/main/pg_hba.conf > /dev/null
+  - echo 'max_wal_senders = 4' | sudo tee --append /etc/postgresql/9.4/main/postgresql.conf > /dev/null
+  - echo 'wal_keep_segments = 4' | sudo tee --append /etc/postgresql/9.4/main/postgresql.conf > /dev/null
+  - echo 'max_replication_slots = 4' | sudo tee --append /etc/postgresql/9.4/main/postgresql.conf > /dev/null
+  - echo 'wal_level = logical' | sudo tee --append /etc/postgresql/9.4/main/postgresql.conf > /dev/null
+  - sudo service postgresql stop 9.4
+  - sudo service postgresql start 9.4
+
 install:
   - go get -v github.com/Masterminds/glide
+
 script:
   - make test
+
+addons:
+  postgresql: "9.4"

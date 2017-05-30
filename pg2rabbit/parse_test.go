@@ -31,54 +31,6 @@ func TestParse(t *testing.T) {
 				}
 
 				So(parsedOutput, ShouldResemble, expectedOutput)
-
-				Convey("When toStruct is called with parsedOutput", func() {
-
-					parsedMessage, err := toStruct(parsedOutput, rawMessage.Received)
-
-					Convey("Expect that there is not a error", func() {
-						So(err, ShouldBeNil)
-
-						Convey("Expect that parsedMessage has the correct table", func() {
-							So(parsedMessage.Table, ShouldEqual, "public.users_usersociallogin")
-						})
-
-						Convey("Expect that parsedMessage has the correct operation", func() {
-							So(parsedMessage.Op, ShouldEqual, "UPDATE")
-						})
-
-						Convey("Expect that Data contains the correct information", func() {
-							expectedData := map[string]DataCol{
-								"id": {
-									Name:  "id",
-									Type:  "integer",
-									Value: "32",
-								},
-								"access_token": {
-									Name:  "access_token",
-									Type:  "bytea",
-									Value: "'hello'",
-								},
-								"social_id": {
-									Name:  "social_id",
-									Type:  "character varying",
-									Value: "'10154308642985348'",
-								},
-								"type": {
-									Name:  "type",
-									Type:  "character varying",
-									Value: "'facebook'",
-								},
-								"user_id": {
-									Name:  "user_id",
-									Type:  "integer",
-									Value: "129",
-								},
-							}
-							So(parsedMessage.Data, ShouldResemble, expectedData)
-						})
-					})
-				})
 			})
 		})
 	})
@@ -103,5 +55,119 @@ func TestParse(t *testing.T) {
 				})
 			})
 		})
+	})
+}
+
+func TestToStruct(t *testing.T) {
+
+	Convey("Gven a valid parsed message output", t, func() {
+
+		parsedOutput := []string{
+			"table",
+			" public.users_usersociallogin:",
+			" UPDATE:",
+			" id[integer]:32",
+			" type[character varying]:'facebook'",
+			" social_id[character varying]:'10154308642985348'",
+			" access_token[bytea]:'hello'",
+			" user_id[integer]:129",
+		}
+
+		Convey("When toStruct is called with parsedOutput", func() {
+
+			parsedMessage, err := toStruct(parsedOutput, time.Now())
+
+			Convey("Expect that there is not a error", func() {
+				So(err, ShouldBeNil)
+
+				Convey("Expect that parsedMessage has the correct table", func() {
+					So(parsedMessage.Table, ShouldEqual, "public.users_usersociallogin")
+				})
+
+				Convey("Expect that parsedMessage has the correct operation", func() {
+					So(parsedMessage.Op, ShouldEqual, "UPDATE")
+				})
+
+				Convey("Expect that Data contains the correct information", func() {
+					expectedData := map[string]DataCol{
+						"id": {
+							Name:  "id",
+							Type:  "integer",
+							Value: "32",
+						},
+						"access_token": {
+							Name:  "access_token",
+							Type:  "bytea",
+							Value: "'hello'",
+						},
+						"social_id": {
+							Name:  "social_id",
+							Type:  "character varying",
+							Value: "'10154308642985348'",
+						},
+						"type": {
+							Name:  "type",
+							Type:  "character varying",
+							Value: "'facebook'",
+						},
+						"user_id": {
+							Name:  "user_id",
+							Type:  "integer",
+							Value: "129",
+						},
+					}
+					So(parsedMessage.Data, ShouldResemble, expectedData)
+				})
+			})
+		})
+	})
+
+	Convey("Gven a invalid parsed messages", t, func() {
+
+		output1 := []string{"skskjoklsdkd"}
+		output2 := []string{
+			"table",
+			" public.users_usersociallogin:",
+			" id[integer]:32",
+			" type[character varying]:'facebook'",
+			" social_id[character varying]:'10154308642985348'",
+			" access_token[bytea]:'hello'",
+			" user_id[integer]:129",
+		}
+
+		output3 := []string{
+			"table",
+			" public.users_usersociallogin:",
+			" UPDATE:",
+			"id[]:32",
+		}
+
+		Convey("When toStruct is called with message with no table", func() {
+
+			_, err := toStruct(output1, time.Now())
+
+			Convey("Expect that there is not a error", func() {
+				So(err, ShouldNotBeNil)
+			})
+		})
+
+		Convey("When toStruct is called with message with no operation", func() {
+
+			_, err := toStruct(output2, time.Now())
+
+			Convey("Expect that there is not a error", func() {
+				So(err, ShouldNotBeNil)
+			})
+		})
+
+		Convey("When toStruct is called with message with invalid column information", func() {
+
+			_, err := toStruct(output3, time.Now())
+
+			Convey("Expect that there is not a error", func() {
+				So(err, ShouldNotBeNil)
+			})
+		})
+
 	})
 }
