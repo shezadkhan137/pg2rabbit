@@ -9,6 +9,30 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+func slotIsAlive(conn *pgx.Conn) bool {
+	rows, _ := conn.Query("SELECT active FROM pg_replication_slots WHERE slot_name = 'test_slot' LIMIT 1")
+	var active bool
+	for rows.Next() {
+		err := rows.Scan(&active)
+		if err != nil {
+			panic(err)
+		}
+		return true
+	}
+	return false
+}
+
+func drainChan(ch chan RawMessage) {
+	for {
+		select {
+		case <-ch:
+			return
+		default:
+			return
+		}
+	}
+}
+
 func TestPostgresReading(t *testing.T) {
 
 	Convey("given a valid postgres database with replication slot", t, func() {
@@ -27,6 +51,7 @@ func TestPostgresReading(t *testing.T) {
 		slotName := "test_slot"
 
 		conn.Exec("SELECT * FROM pg_create_logical_replication_slot('test_slot', 'test_decoding')")
+		conn.Exec("CREATE TABLE tasks (id serial primary key, description TEXT NOT NULL)")
 
 		Convey("check that SetupPostgresConnection returns valid connection", func() {
 
@@ -41,41 +66,56 @@ func TestPostgresReading(t *testing.T) {
 					Convey("when that connection is given to LaunchRDSStream", func() {
 
 						messageChan := make(chan RawMessage)
-						closeChan := make(chan bool)
+						closeChan := make(chan bool, 1)
 
 						go LaunchRDSStream(replicaConnection, messageChan, slotName, false, closeChan)
 
 						Convey("check LaunchRDSStream keeps the connection alive", func() {
 
-							time.Sleep(1 * time.Second)
+							Convey("when a insert is made", func() {
+								_, _ = conn.Exec("insert into tasks(description) values($1)", "hello world")
 
-							rows, _ := conn.Query("SELECT active FROM pg_replication_slots WHERE slot_name = 'test_slot' LIMIT 1")
-							var active bool
-							for rows.Next() {
-								err := rows.Scan(&active)
-								if err != nil {
-									panic(err)
-								}
-								break
-							}
+								Convey("and we wait two seconds", func() {
 
-							So(active, ShouldBeTrue)
-							So(replicaConnection.IsAlive(), ShouldBeTrue)
+									time.Sleep(2 * time.Second)
 
-							Convey("check on INSERT the correct raw message is received", nil)
+									Convey("check than connection is still alive", func() {
+										So(slotIsAlive(conn), ShouldBeTrue)
+										So(replicaConnection.IsAlive(), ShouldBeTrue)
 
-							Convey("check on UPDATE that the correct raw message is received", nil)
+										Convey("after message chan is drained", func() {
 
-							Convey("check on DELETE the correct raw message is received", nil)
+											drainChan(messageChan)
 
-							Convey("check that when LaunchRDSStream exits, the slot is destroyed", func() {
+											Convey("check connection is still alive", func() {
 
+												So(slotIsAlive(conn), ShouldBeTrue)
+											})
+
+										})
+
+									})
+								})
 							})
+
+						})
+
+						Convey("check on INSERT the correct raw message is received", nil)
+
+						Convey("check on UPDATE that the correct raw message is received", nil)
+
+						Convey("check on DELETE the correct raw message is received", nil)
+
+						Convey("check that when LaunchRDSStream exits, the slot is destroyed", func() {
+
 						})
 
 						Reset(func() {
+							fmt.Println("resetting")
 							closeChan <- true
+							fmt.Println("closing")
 							for {
+								fmt.Println("looping")
 								_, more := <-messageChan
 								if !more {
 									return
@@ -97,6 +137,7 @@ func TestPostgresReading(t *testing.T) {
 		Reset(func() {
 			fmt.Println("dropping slot")
 			conn.Exec("select pg_drop_replication_slot('test_slot')")
+			conn.Exec("DROP TABLE tasks")
 		})
 
 	})
