@@ -46,7 +46,7 @@ func LaunchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan<- RawM
 		log.Fatal(err.Error())
 	}
 
-	var lastWalStart uint64 = 0
+	//var lastWalStart uint64 = 0
 	var messageCount int = 0
 
 	for {
@@ -61,10 +61,6 @@ func LaunchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan<- RawM
 		message, err := repConnection.WaitForReplicationMessage(time.Duration(10) * time.Millisecond)
 		if err != nil {
 			if err == pgx.ErrNotificationTimeout {
-				err2 := sendStandby(repConnection, lastWalStart)
-				if err2 != nil {
-					panic(err2)
-				}
 				continue
 			}
 			// Could have some backoff & reconnect here
@@ -75,16 +71,8 @@ func LaunchRDSStream(repConnection *pgx.ReplicationConn, messageChan chan<- RawM
 			continue
 		}
 
-		lastWalStart = message.WalMessage.WalStart
+		//lastWalStart = message.WalMessage.WalStart
 		messageCount += 1
-
-		if messageCount%100 == 0 {
-			err := sendStandby(repConnection, lastWalStart)
-			if err != nil {
-				// Could have some backoff & reconnect here
-				panic(err)
-			}
-		}
 
 		dataString := string(message.WalMessage.WalData)
 		messageChan <- RawMessage{DataString: dataString, Received: time.Now()}
