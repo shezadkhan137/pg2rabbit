@@ -22,13 +22,12 @@ func slotIsAlive(conn *pgx.Conn) bool {
 	return false
 }
 
-func drainChan(ch chan RawMessage) {
+func drainChan(ch chan RawMessage, number int) (messages []RawMessage) {
 	for {
-		select {
-		case <-ch:
-			return
-		default:
-			return
+		m := <-ch
+		messages = append(messages, m)
+		if len(messages) == number {
+			return messages
 		}
 	}
 }
@@ -69,27 +68,41 @@ func TestPostgresReading(t *testing.T) {
 						closeChan := make(chan bool, 1)
 
 						go LaunchRDSStream(replicaConnection, messageChan, slotName, false, closeChan)
+						time.Sleep(1 * time.Second)
 
 						Convey("check LaunchRDSStream keeps the connection alive", func() {
 
+							fmt.Println("1")
+
 							Convey("when a insert is made", func() {
-								_, _ = conn.Exec("insert into tasks(description) values($1)", "hello world")
+								fmt.Println("2")
 
-								Convey("and we wait two seconds", func() {
+								go func() {
+									for i := 0; i < 1000; i++ {
+										_, _ = conn.Exec("insert into tasks(description) values($1)", "hello world")
+									}
 
-									time.Sleep(2 * time.Second)
+								}()
+
+								Convey("and we wait five seconds", func() {
+									fmt.Println("3")
+
+									time.Sleep(60 * time.Second)
 
 									Convey("check than connection is still alive", func() {
+										fmt.Println("4")
 										So(slotIsAlive(conn), ShouldBeTrue)
 										So(replicaConnection.IsAlive(), ShouldBeTrue)
 
 										Convey("after message chan is drained", func() {
+											fmt.Println("5")
 
-											drainChan(messageChan)
+											messages := drainChan(messageChan, 5)
+											fmt.Printf("%+v", messages)
 
 											Convey("check connection is still alive", func() {
 
-												So(slotIsAlive(conn), ShouldBeTrue)
+												So(replicaConnection.IsAlive(), ShouldBeTrue)
 											})
 
 										})
